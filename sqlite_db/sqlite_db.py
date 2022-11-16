@@ -32,12 +32,20 @@ async def sale_add_position(state):
         base.commit()
 
 
-async def read_menu():
-    return cur.execute('SELECT * FROM menu').fetchall()
+async def read_menu_class():
+    return cur.execute('SELECT DISTINCT cls FROM menu').fetchall()
 
 
-async def read_drinks():
-    return cur.execute('SELECT * FROM drinks').fetchall()
+async def read_menu_list(data):
+    return cur.execute('SELECT * FROM menu WHERE cls == ?', (data,))
+
+
+async def read_drinks_class():
+    return cur.execute('SELECT DISTINCT cls FROM drinks').fetchall()
+
+
+async def read_drinks_list(data):
+    return cur.execute('SELECT * FROM drinks WHERE cls == ?', (data,))
 
 
 async def read_sale():
@@ -45,15 +53,15 @@ async def read_sale():
 
 
 async def delete_command_menu(data):
-    cur.execute('DELETE FROM menu WHERE name = ?', (data,))
+    cur.execute('DELETE FROM menu WHERE name == ?', (str(data),))
     base.commit()
 
 
 async def delete_command_sale(data):
-    cur.execute('DELETE FROM sale WHERE name = ?', (data,))
+    cur.execute('DELETE FROM sale WHERE name == ?', (str(data),))
     base.commit()
 
 
 async def delete_command_drinks(data):
-    cur.execute('DELETE FROM drinks WHERE name = ?', (data,))
+    cur.execute('DELETE FROM drinks WHERE name == ?', (str(data),))
     base.commit()

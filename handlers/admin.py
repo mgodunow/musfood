@@ -5,7 +5,7 @@ from aiogram.dispatcher.filters import Text
 from bot_create import bot
 from sqlite_db.sqlite_db import *
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, KeyboardButton, ReplyKeyboardMarkup
-from keyboard.admin_kb import kb_admin, kb_admin_f_or_d, kb_admin_cancel
+from keyboard.admin_kb import kb_admin, kb_admin_cancel
 
 ID = None
 
@@ -15,8 +15,7 @@ async def moderator(message: types.Message):
     global ID
     ID = message.from_user.id
     if message.from_user.id == ID:
-        await bot.send_message(message.from_user.id, 'Что желаете? Добавить - добавление еды и напитков\n'
-                                                     'Акции - удаление и добавление акций', reply_markup=kb_admin)
+        await bot.send_message(message.from_user.id, 'Что желаете?', reply_markup=kb_admin)
 
 
 # Отмена машины состояний
@@ -67,7 +66,7 @@ async def load_sale_description(message: types.Message, state: FSMContext):
         await message.reply('Акция успешно добавлена')
 
 
-# Машина состояний для напитков и еды
+# Машина состояний для добавления напитков и еды
 class FSMAdmin(StatesGroup):
     tip = State()
     cls = State()
@@ -77,20 +76,17 @@ class FSMAdmin(StatesGroup):
     ingredients = State()
 
 
-async def cm_start(message: types.Message):
+async def cm_start(message: types.Message, state: FSMContext):
     if message.from_user.id == ID:
         await FSMAdmin.tip.set()
-        # Также здесь должна выпадать клавиатура
-        await message.reply('Еду или напиток вы собираетесь добавить в меню?:', reply_markup=kb_admin_f_or_d)
-
-
-async def load_type(message: types.Message, state=FSMContext):
-    if message.from_user.id == ID:
-        async with state.proxy() as data:
-            data['type'] = message.text
-        await FSMAdmin.next()
-        await message.reply('Введите класс продукта, который хотите добавить (например: пицца)',
-                            reply_markup=kb_admin_cancel)
+    async with state.proxy() as data:
+        if message.text.replace('Добавить ', '') == 'еду':
+            data['type'] = 'Еда'
+        else:
+            data['type'] = 'Напиток'
+    await FSMAdmin.next()
+    await message.reply('Введите класс продукта, который хотите добавить (например, пицца)',
+                        reply_markup=kb_admin_cancel)
 
 
 async def load_cls(message: types.Message, state=FSMContext):
@@ -140,42 +136,98 @@ async def load_ingridients(message: types.Message, state=FSMContext):
         await state.finish()
 
 
+# Callback для удаления еды
 async def del_callback_run_menu(callback_query: types.CallbackQuery):
-    await delete_command_menu(callback_query.data.replace('del ', ''))
-    await callback_query.answer(text=f'{callback_query.data.replace("del ", "")} удалена', show_alert=True)
+    await delete_command_menu(callback_query.data.replace('del_menu ', ''))
+    await callback_query.answer(text=f'{callback_query.data.replace("del_menu ", "")} удалена', show_alert=True)
 
 
-async def delete_food(message: types.Message):
+# Машина состояний для отображения списка еды
+class FSMFoodList(StatesGroup):
+    cls = State()
+
+
+async def food_cls_choice(message: types.Message, state: FSMContext):
     if message.from_user.id == ID:
-        read = await read_menu()
+        await FSMFoodList.cls.set()
+        read = await read_menu_class()
+        if read:
+            classes = ReplyKeyboardMarkup()
+            for cls in read:
+                btn = KeyboardButton(cls[0])
+                classes.row(btn)
+
+            await message.reply('Выберите класс тех продуктов, которые желаете просмотреть', reply_markup=classes)
+        else:
+            await state.finish()
+            await message.reply('Хотите добавить еду?', reply_markup=ReplyKeyboardMarkup().
+                                add(KeyboardButton('Добавить еду')))
+
+
+async def food_list(message: types.Message, state: FSMContext):
+    if message.from_user.id == ID:
+        async with state.proxy() as data:
+            data['cls'] = message.text
+        read = await read_menu_list(data['cls'])
         for rec in read:
             await bot.send_photo(message.from_user.id, rec[3], f'Тип:{rec[0]}\nКласс:{rec[1]}\nНазвание:{rec[2]}\n'
                                                                f'Цена:{rec[4]}\nИнгридиенты:{rec[5]}')
             await bot.send_message(message.from_user.id, text='***', reply_markup=InlineKeyboardMarkup().add(
-                InlineKeyboardButton(f'Удалить {rec[2]}', callback_data=f'del {rec[2]}')
+                InlineKeyboardButton(f'Удалить {rec[2]}', callback_data=f'del_menu {rec[2]}')
             ))
+        await state.finish()
+        await message.reply('Хотите добавить еду?', reply_markup=ReplyKeyboardMarkup().
+                            add(KeyboardButton('Добавить еду')))
 
 
+# Callback для удаления напитков
 async def del_callback_run_drinks(callback_query: types.CallbackQuery):
-    await delete_command_drinks(callback_query.data.replace('del ', ''))
-    await callback_query.answer(text=f'{callback_query.data.replace("del ", "")} удалена', show_alert=True)
+    await delete_command_drinks(callback_query.data.replace('del_drinks ', ''))
+    await callback_query.answer(text=f'{callback_query.data.replace("del_drinks ", "")} удалена', show_alert=True)
 
 
-async def delete_drinks(message: types.Message):
+# Машина состояний для отображения списка напитков
+class FSMDrinksList(StatesGroup):
+    cls = State()
+
+
+async def drinks_cls_choice(message: types.Message, state: FSMContext):
     if message.from_user.id == ID:
-        read = await read_drinks()
+        await FSMDrinksList.cls.set()
+        read = await read_drinks_class()
+        if read:
+            classes = ReplyKeyboardMarkup()
+            for cls in read:
+                btn = KeyboardButton(cls[0])
+                classes.row(btn)
+
+            await message.reply('Выберите класс тех напитков, которые желаете просмотреть', reply_markup=classes)
+        else:
+            await state.finish()
+            await message.reply('Хотите добавить напиток?', reply_markup=ReplyKeyboardMarkup().
+                                add(KeyboardButton('Добавить напиток')))
+
+
+async def drinks_list(message: types.Message, state: FSMContext):
+    if message.from_user.id == ID:
+        async with state.proxy() as data:
+            data['cls'] = message.text
+        read = await read_drinks_list(data['cls'])
         for rec in read:
             await bot.send_photo(message.from_user.id, rec[3], f'Тип:{rec[0]}\nКласс:{rec[1]}\nНазвание:{rec[2]}\n'
                                                                f'Цена:{rec[4]}\nИнгридиенты:{rec[5]}')
             await bot.send_message(message.from_user.id, text='***', reply_markup=InlineKeyboardMarkup().add(
-                InlineKeyboardButton(f'Удалить {rec[2]}', callback_data=f'del {rec[2]}')
+                InlineKeyboardButton(f'Удалить {rec[2]}', callback_data=f'del_drinks {rec[2]}')
             ))
+        await state.finish()
+        await message.reply('Хотите добавить напиток?', reply_markup=ReplyKeyboardMarkup().
+                            add(KeyboardButton('Добавить напиток')))
 
 
 # Отображаем акции с кнопками удаления под каждой
 async def del_callback_run_sale(callback_query: types.CallbackQuery):
-    await delete_command_sale(callback_query.data.replace('del ', ''))
-    await callback_query.answer(text=f'{callback_query.data.replace("del ", "")} удалена', show_alert=True)
+    await delete_command_sale(callback_query.data.replace('del_sale ', ''))
+    await callback_query.answer(text=f'{callback_query.data.replace("del_sale ", "")} удалена', show_alert=True)
 
 
 async def sale_list(message: types.Message):
@@ -184,12 +236,13 @@ async def sale_list(message: types.Message):
         for rec in read:
             await bot.send_photo(message.from_user.id, rec[0], f'Название:{rec[1]}\nОписание:{rec[2]}')
             await bot.send_message(message.from_user.id, text='***', reply_markup=InlineKeyboardMarkup().add(
-                InlineKeyboardButton(f'Удалить {rec[1]}', callback_data=f'del {rec[1]}')
+                InlineKeyboardButton(f'Удалить {rec[1]}', callback_data=f'del_sale {rec[1]}')
             ))
         await message.reply('Хотите добавить акцию?',
                             reply_markup=ReplyKeyboardMarkup().add(KeyboardButton('Добавить акцию')))
 
 
+# Наконец, регистрация хендлеров. Удачи тому, кто все это прочел.
 def register_admin_handers(dp: Dispatcher):
     dp.register_message_handler(moderator, commands='mod')
     dp.register_message_handler(moderator, Text(equals='mod', ignore_case=True))
@@ -200,20 +253,23 @@ def register_admin_handers(dp: Dispatcher):
     dp.register_message_handler(load_sale_photo, content_types=['photo'], state=FSMAdminSale.photo)
     dp.register_message_handler(load_sale_name, state=FSMAdminSale.name)
     dp.register_message_handler(load_sale_description, state=FSMAdminSale.description)
-    dp.register_message_handler(cm_start, commands='Добавить', state=None)
-    dp.register_message_handler(cm_start, Text(equals='Добавить', ignore_case=True))
-    dp.register_message_handler(load_type, state=FSMAdmin.tip)
+    dp.register_message_handler(cm_start, commands='Добавить еду', state=None)
+    dp.register_message_handler(cm_start, Text(equals='Добавить еду', ignore_case=True))
+    dp.register_message_handler(cm_start, commands='Добавить напиток', state=None)
+    dp.register_message_handler(cm_start, Text(equals='Добавить напиток', ignore_case=True))
     dp.register_message_handler(load_cls, state=FSMAdmin.cls)
     dp.register_message_handler(load_name, state=FSMAdmin.name)
     dp.register_message_handler(load_photo, content_types=['photo'], state=FSMAdmin.photo)
     dp.register_message_handler(load_price, state=FSMAdmin.price)
     dp.register_message_handler(load_ingridients, state=FSMAdmin.ingredients)
-    dp.register_callback_query_handler(del_callback_run_drinks, lambda x: x.data and x.data.startswith('del '))
-    dp.register_callback_query_handler(del_callback_run_menu, lambda x: x.data and x.data.startswith('del '))
-    dp.register_callback_query_handler(del_callback_run_sale, lambda x: x.data and x.data.startswith('del '))
-    dp.register_message_handler(delete_food, commands='Еда')
-    dp.register_message_handler(delete_food, Text(equals='Еда', ignore_case=True))
-    dp.register_message_handler(delete_drinks, commands='Напитки')
-    dp.register_message_handler(delete_drinks, Text(equals='Напитки', ignore_case=True))
+    dp.register_callback_query_handler(del_callback_run_menu, lambda x: x.data and x.data.startswith('del_menu '))
+    dp.register_callback_query_handler(del_callback_run_drinks, lambda x: x.data and x.data.startswith('del_drinks '))
+    dp.register_callback_query_handler(del_callback_run_sale, lambda x: x.data and x.data.startswith('del_sale '))
+    dp.register_message_handler(food_cls_choice, commands='Еда')
+    dp.register_message_handler(food_cls_choice, Text(equals='Еда', ignore_case=True))
+    dp.register_message_handler(food_list, state=FSMFoodList.cls)
+    dp.register_message_handler(drinks_cls_choice, commands='Напитки')
+    dp.register_message_handler(drinks_cls_choice, Text(equals='Напитки', ignore_case=True))
+    dp.register_message_handler(drinks_list, state=FSMDrinksList.cls)
     dp.register_message_handler(sale_list, commands='Акции')
     dp.register_message_handler(sale_list, Text(equals='Акции', ignore_case=True))
