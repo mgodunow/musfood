@@ -7,20 +7,32 @@ from sqlite_db.sqlite_db import *
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, KeyboardButton, ReplyKeyboardMarkup
 from keyboard.admin_kb import kb_admin, kb_admin_cancel
 
-ID = None
+
+# Получаем id администраторов чата
+async def id_moderators_list():
+    admins = await bot.get_chat_administrators(chat_id='chat_id')
+    text = []
+    for admin in admins:
+        user_id = admin.user.id
+        text.append(user_id)
+    return text
 
 
 # Проверка на администратора
 async def moderator(message: types.Message):
-    global ID
-    ID = message.from_user.id
-    if message.from_user.id == ID:
+    global is_moderator
+    is_moderator = False
+    moderators_list_id = await id_moderators_list()
+    if message.from_user.id in moderators_list_id:
+        is_moderator = True
         await bot.send_message(message.from_user.id, 'Что желаете?', reply_markup=kb_admin)
+    else:
+        await bot.send_message(message.from_user.id, 'Вы не являетесь модератором')
 
 
 # Отмена машины состояний
 async def cancel_fsm(message: types.Message, state: FSMContext):
-    if message.from_user.id == ID:
+    if is_moderator:
         current_state = await state.get_state()
         if current_state is None:
             return
@@ -36,13 +48,13 @@ class FSMAdminSale(StatesGroup):
 
 
 async def sale_start(message: types.Message):
-    if message.from_user.id == ID:
+    if is_moderator:
         await FSMAdminSale.photo.set()
         await message.reply('Отправьте картинку для акции')
 
 
 async def load_sale_photo(message: types.Message, state: FSMContext):
-    if message.from_user.id == ID:
+    if is_moderator:
         async with state.proxy() as data:
             data['photo'] = message.photo[0].file_id
         await FSMAdminSale.next()
@@ -50,7 +62,7 @@ async def load_sale_photo(message: types.Message, state: FSMContext):
 
 
 async def load_sale_name(message: types.Message, state: FSMContext):
-    if message.from_user.id == ID:
+    if is_moderator:
         async with state.proxy() as data:
             data['name'] = message.text
         await FSMAdminSale.next()
@@ -58,7 +70,7 @@ async def load_sale_name(message: types.Message, state: FSMContext):
 
 
 async def load_sale_description(message: types.Message, state: FSMContext):
-    if message.from_user.id == ID:
+    if is_moderator:
         async with state.proxy() as data:
             data['desc'] = message.text
         await sale_add_position(state)
@@ -77,7 +89,7 @@ class FSMAdmin(StatesGroup):
 
 
 async def cm_start(message: types.Message, state: FSMContext):
-    if message.from_user.id == ID:
+    if is_moderator:
         await FSMAdmin.tip.set()
     async with state.proxy() as data:
         if message.text.replace('Добавить ', '') == 'еду':
@@ -90,7 +102,7 @@ async def cm_start(message: types.Message, state: FSMContext):
 
 
 async def load_cls(message: types.Message, state=FSMContext):
-    if message.from_user.id == ID:
+    if is_moderator:
         async with state.proxy() as data:
             data['cls'] = message.text
         await FSMAdmin.next()
@@ -98,7 +110,7 @@ async def load_cls(message: types.Message, state=FSMContext):
 
 
 async def load_name(message: types.Message, state=FSMContext):
-    if message.from_user.id == ID:
+    if is_moderator:
         async with state.proxy() as data:
             data['name'] = message.text
         await FSMAdmin.next()
@@ -106,7 +118,7 @@ async def load_name(message: types.Message, state=FSMContext):
 
 
 async def load_photo(message: types.Message, state=FSMContext):
-    if message.from_user.id == ID:
+    if is_moderator:
         async with state.proxy() as data:
             data['photo'] = message.photo[0].file_id
         await FSMAdmin.next()
@@ -114,7 +126,7 @@ async def load_photo(message: types.Message, state=FSMContext):
 
 
 async def load_price(message: types.Message, state=FSMContext):
-    if message.from_user.id == ID:
+    if is_moderator:
         async with state.proxy() as data:
             data['price'] = message.text
         await FSMAdmin.next()
@@ -122,7 +134,7 @@ async def load_price(message: types.Message, state=FSMContext):
 
 
 async def load_ingridients(message: types.Message, state=FSMContext):
-    if message.from_user.id == ID:
+    if is_moderator:
         async with state.proxy() as data:
             data['ingridients'] = message.text
         if data['type'] != 'Еда' and data['type'] != 'Напиток':
@@ -148,7 +160,7 @@ class FSMFoodList(StatesGroup):
 
 
 async def food_cls_choice(message: types.Message, state: FSMContext):
-    if message.from_user.id == ID:
+    if is_moderator:
         await FSMFoodList.cls.set()
         read = await read_menu_class()
         if read:
@@ -165,7 +177,7 @@ async def food_cls_choice(message: types.Message, state: FSMContext):
 
 
 async def food_list(message: types.Message, state: FSMContext):
-    if message.from_user.id == ID:
+    if is_moderator:
         async with state.proxy() as data:
             data['cls'] = message.text
         read = await read_menu_list(data['cls'])
@@ -192,7 +204,7 @@ class FSMDrinksList(StatesGroup):
 
 
 async def drinks_cls_choice(message: types.Message, state: FSMContext):
-    if message.from_user.id == ID:
+    if is_moderator:
         await FSMDrinksList.cls.set()
         read = await read_drinks_class()
         if read:
@@ -209,7 +221,7 @@ async def drinks_cls_choice(message: types.Message, state: FSMContext):
 
 
 async def drinks_list(message: types.Message, state: FSMContext):
-    if message.from_user.id == ID:
+    if is_moderator:
         async with state.proxy() as data:
             data['cls'] = message.text
         read = await read_drinks_list(data['cls'])
@@ -231,7 +243,7 @@ async def del_callback_run_sale(callback_query: types.CallbackQuery):
 
 
 async def sale_list(message: types.Message):
-    if message.from_user.id == ID:
+    if is_moderator:
         read = await read_sale()
         for rec in read:
             await bot.send_photo(message.from_user.id, rec[0], f'Название:{rec[1]}\nОписание:{rec[2]}')
