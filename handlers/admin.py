@@ -32,12 +32,11 @@ async def moderator(message: types.Message):
 
 # Отмена машины состояний
 async def cancel_fsm(message: types.Message, state: FSMContext):
-    if is_moderator:
-        current_state = await state.get_state()
-        if current_state is None:
-            return
-        await state.finish()
-        await message.reply('Отменено')
+    current_state = await state.get_state()
+    if current_state is None:
+        return
+    await state.finish()
+    await message.reply('Отменено')
 
 
 # Машина состояний для акций
