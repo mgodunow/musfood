@@ -12,6 +12,12 @@ def sql_start():
     base.execute('CREATE TABLE IF NOT EXISTS drinks(tip TEXT,cls TEXT, name TEXT PRIMARY KEY, '
                  'img TEXT, price TEXT, ingridients TEXT)')
     base.execute('CREATE TABLE IF NOT EXISTS sale(img TEXT, name TEXT PRIMARY KEY, desc TEXT)')
+    base.execute('CREATE TABLE IF NOT EXISTS cart(user_id, goods TEXT)')
+
+
+async def add_user_to_cart(data):
+    cur.execute('INSERT INTO cart VALUES(?,"")', (str(data),))
+    base.commit()
 
 
 async def menu_add_position(state):
@@ -64,4 +70,18 @@ async def delete_command_sale(data):
 
 async def delete_command_drinks(data):
     cur.execute('DELETE FROM drinks WHERE name == ?', (str(data),))
+    base.commit()
+
+
+async def select_cart(user_id):
+    return cur.execute('SELECT goods FROM cart WHERE user_id == ?', (user_id,)).fetchall()
+
+
+async def to_cart(user_id, cart):
+    cur.execute(f'INSERT INTO cart VALUES({user_id},?)', (str(cart),))
+    base.commit()
+
+
+async def delete_cart(user_id, product):
+    cur.execute('DELETE FROM cart WHERE user_id == ?', [user_id, product])
     base.commit()

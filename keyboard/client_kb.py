@@ -3,11 +3,11 @@ from aiogram.types import ReplyKeyboardMarkup, ReplyKeyboardRemove, KeyboardButt
 # Клавиатура для start
 button1 = KeyboardButton('Меню')
 button2 = KeyboardButton('О нас')
-button3 = KeyboardButton('Доставка')
+button3 = KeyboardButton('Корзина')
 button4 = KeyboardButton('Наши акции')
 
 kb_client_start = ReplyKeyboardMarkup()
-kb_client_start.add(button1).add(button2).add(button3).row(button4)
+kb_client_start.add(button1).add(button2).add(button3).add(button4)
 
 # Клавиатура для меню
 menu_btn1 = KeyboardButton('Еда')

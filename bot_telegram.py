@@ -8,7 +8,7 @@ async def on_startup(_):
     print('Bot is online')
     sqlite_db.sql_start()
 
-client.register_client_handers(dp)
 admin.register_admin_handers(dp)
+client.register_client_handers(dp)
 
 executor.start_polling(dp, skip_updates=True, on_startup=on_startup)
