@@ -15,3 +15,10 @@ menu_btn2 = KeyboardButton('Напитки')
 
 kb_client_menu = ReplyKeyboardMarkup()
 kb_client_menu.row(menu_btn1, menu_btn2)
+
+cart_kb = ReplyKeyboardMarkup()
+
+cart_btn1 = KeyboardButton('Удалить из корзины')
+cart_btn2 = KeyboardButton('Оформить заказ')
+
+cart_kb.add(cart_btn1).add(cart_btn2)

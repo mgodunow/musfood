@@ -12,12 +12,7 @@ def sql_start():
     base.execute('CREATE TABLE IF NOT EXISTS drinks(tip TEXT,cls TEXT, name TEXT PRIMARY KEY, '
                  'img TEXT, price TEXT, ingridients TEXT)')
     base.execute('CREATE TABLE IF NOT EXISTS sale(img TEXT, name TEXT PRIMARY KEY, desc TEXT)')
-    base.execute('CREATE TABLE IF NOT EXISTS cart(user_id, goods TEXT)')
-
-
-async def add_user_to_cart(data):
-    cur.execute('INSERT INTO cart VALUES(?,"")', (str(data),))
-    base.commit()
+    base.execute('CREATE TABLE IF NOT EXISTS cart(user_id, product TEXT, price TEXT)')
 
 
 async def menu_add_position(state):
@@ -74,14 +69,20 @@ async def delete_command_drinks(data):
 
 
 async def select_cart(user_id):
-    return cur.execute('SELECT goods FROM cart WHERE user_id == ?', (user_id,)).fetchall()
+    return cur.execute('SELECT product, price FROM cart WHERE user_id == ?', (user_id,)).fetchall()
 
 
-async def to_cart(user_id, cart):
-    cur.execute(f'INSERT INTO cart VALUES({user_id},?)', (str(cart),))
+async def select_price_cart(user_id, product):
+    return cur.execute('SELECT price FROM cart WHERE user_id == ? and product == ?', [user_id, product])
+
+
+async def to_cart(user_id, cart, price):
+    cur.execute('INSERT INTO cart VALUES(?,?,?)', [user_id, cart, price])
     base.commit()
 
 
-async def delete_cart(user_id, product):
-    cur.execute('DELETE FROM cart WHERE user_id == ?', [user_id, product])
+async def delete_user_cart(user_id, product):
+    product = cur.execute('SELECT rowid FROM cart WHERE user_id == ? AND product == ? LIMIT 1', (int(user_id),product)).fetchall()
+    print(product[0])
+    cur.execute('DELETE FROM cart WHERE rowid == ?', product[0])
     base.commit()

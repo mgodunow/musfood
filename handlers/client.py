@@ -1,7 +1,7 @@
 from aiogram import Dispatcher
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardButton, InlineKeyboardMarkup
 from aiogram import types
-from keyboard.client_kb import kb_client_start, kb_client_menu
+from keyboard.client_kb import kb_client_start, kb_client_menu, cart_kb
 from aiogram.dispatcher.filters import Text
 from aiogram.dispatcher.filters.state import State, StatesGroup
 from aiogram.dispatcher import FSMContext
@@ -83,8 +83,8 @@ async def load_cls(message: types.Message, state: FSMContext):
 
 async def add_pos_to_cart(callback_query: types.CallbackQuery):
     user_id = callback_query.from_user.id
-    product = str(callback_query.data.replace('in_cart ', ''))
-    await to_cart(user_id, product)
+    productnprice = callback_query.data.replace('in_cart ', '').split('_')
+    await to_cart(user_id, productnprice[0], productnprice[1])
     await callback_query.answer(text=f'{callback_query.data.replace("in_cart","").split("_")[0]} : добавлено в корзину')
 
 
@@ -93,9 +93,34 @@ async def cart(message: types.Message):
     cart = ''
     price = 0
     for product in products:
-        cart += str(product[0].replace('_' ,': ') + '\n')
-        price += int(product[0].split('_')[1])
-    await bot.send_message(message.from_user.id, f'{cart}\nИтого:{price}')
+        cart += str(product[0] + '\n')
+        price += int(product[1])
+    await bot.send_message(message.from_user.id, f'{cart}\nИтого:{price}', reply_markup=cart_kb)
+
+
+class FSMcart(StatesGroup):
+    products = State()
+    del_product = State()
+
+
+async def del_cart(message: types.Message, state: FSMContext):
+    await FSMcart.products.set()
+    products = await select_cart(message.from_user.id)
+    kb_del_cart = ReplyKeyboardMarkup()
+    for product in products:
+        kb_del_cart_button = KeyboardButton(str(product[0]))
+        kb_del_cart.row(kb_del_cart_button)
+    await bot.send_message(message.from_user.id, 'Что хотите удалить?', reply_markup=kb_del_cart)
+    await FSMcart.next()
+
+
+async def del_product_cart(message: types.Message, state: FSMContext):
+    pos = str(message.from_user.id), message.text
+    await delete_user_cart(str(message.from_user.id), message.text)
+    await bot.send_message(message.from_user.id, 'Позиция удалена', reply_markup=ReplyKeyboardMarkup().add(
+        KeyboardButton('Корзина')
+    ))
+    await state.finish()
 
 
 def register_client_handers(dp: Dispatcher):
@@ -111,3 +136,6 @@ def register_client_handers(dp: Dispatcher):
     dp.register_message_handler(cart, commands=['Корзина'])
     dp.register_message_handler(cart, Text(equals='Корзина', ignore_case=True))
     dp.register_callback_query_handler(add_pos_to_cart, lambda x: x.data and x.data.startswith('in_cart'))
+    dp.register_message_handler(del_cart, commands=['Удалить из корзины'], state=None)
+    dp.register_message_handler(del_cart, Text(equals='Удалить из корзины', ignore_case=True))
+    dp.register_message_handler(del_product_cart, state=FSMcart.del_product)
