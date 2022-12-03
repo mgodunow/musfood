@@ -16,7 +16,8 @@ async def start(message: types.Message):
 async def about(message: types.Message):
     await message.reply('Открыты с 2004 года\n241870 гостей уже попробовали нашу еду'
                         '\n78000 пицц приготовлено в 2021 году'
-                        '\nДоставим бесплатно от 2.5 тысяч рублей! Среднее время доставки 26 минут')
+                        '\nДоставим бесплатно от 2.5 тысяч рублей! Среднее время доставки 26 минут', reply_markup=
+                        ReplyKeyboardMarkup().add(KeyboardButton('\U0001F3E0')))
 
 
 async def menu(message: types.Message):
@@ -27,6 +28,8 @@ async def sale_list(message: types.Message):
     sales = await read_sale()
     for sale in sales:
         await bot.send_photo(message.from_user.id, sale[0], f'{sale[1]}\n{sale[2]}')
+    await bot.send_message(message.from_user.id, 'Наши действующие акции', reply_markup=ReplyKeyboardMarkup().
+                           add(KeyboardButton('\U0001F3E0')))
 
 
 class FSMmenu(StatesGroup):
@@ -37,14 +40,22 @@ class FSMmenu(StatesGroup):
 async def start_menu(message: types.Message):
     await FSMmenu.tip.set()
     await message.reply('Еда или напитки?', reply_markup=ReplyKeyboardMarkup().add(KeyboardButton('Еда'))
-                        .add(KeyboardButton('Напитки')))
+                        .add(KeyboardButton('Напитки')).add(KeyboardButton('\U0001F3E0')))
+
+
+async def main(message: types.Message):
+    await message.reply('Вы на главной', reply_markup=kb_client_start)
 
 
 async def load_tip(message: types.Message, state: FSMContext):
     async with state.proxy() as data:
         data['tip'] = message.text
     cls_list = []
-    if data['tip'] == 'Еда':
+    if data['tip'] == '\U0001F3E0':
+        await message.reply('Вы на главной', reply_markup=kb_client_start)
+        await state.finish()
+        return
+    elif data['tip'] == 'Еда':
         cls_list = await read_menu_class()
     elif data['tip'] == 'Напитки':
         cls_list = await read_drinks_class()
@@ -59,7 +70,7 @@ async def load_tip(message: types.Message, state: FSMContext):
     for cls in cls_list:
         button = KeyboardButton(cls[0])
         classes.row(button)
-    await message.reply('Выберите что-нибудь :)', reply_markup=classes)
+    await message.reply('Выберите что-нибудь :)', reply_markup=classes.add('\U0001F3E0'))
     await FSMmenu.next()
 
 
@@ -68,6 +79,9 @@ async def load_cls(message: types.Message, state: FSMContext):
     read = []
     async with state.proxy() as data:
         data['cls'] = message.text
+        if data['cls'] == '\U0001F3E0':
+            await state.finish()
+            await message.reply('Вы на главной', reply_markup=kb_client_start)
         if data['tip'] == 'Еда':
             read = await read_menu_list(data['cls'])
         if data['tip'] == 'Напитки':
@@ -103,7 +117,7 @@ class FSMcart(StatesGroup):
     del_product = State()
 
 
-async def del_cart(message: types.Message, state: FSMContext):
+async def del_cart(message: types.Message):
     await FSMcart.products.set()
     products = await select_cart(message.from_user.id)
     kb_del_cart = ReplyKeyboardMarkup()
@@ -115,12 +129,15 @@ async def del_cart(message: types.Message, state: FSMContext):
 
 
 async def del_product_cart(message: types.Message, state: FSMContext):
-    pos = str(message.from_user.id), message.text
     await delete_user_cart(str(message.from_user.id), message.text)
     await bot.send_message(message.from_user.id, 'Позиция удалена', reply_markup=ReplyKeyboardMarkup().add(
         KeyboardButton('Корзина')
     ))
     await state.finish()
+
+
+async def command_handler(message: types.Message):
+    await message.reply('Такой команды нет ' + '\U0001f60C')
 
 
 def register_client_handers(dp: Dispatcher):
@@ -136,6 +153,9 @@ def register_client_handers(dp: Dispatcher):
     dp.register_message_handler(cart, commands=['Корзина'])
     dp.register_message_handler(cart, Text(equals='Корзина', ignore_case=True))
     dp.register_callback_query_handler(add_pos_to_cart, lambda x: x.data and x.data.startswith('in_cart'))
-    dp.register_message_handler(del_cart, commands=['Удалить из корзины'], state=None)
-    dp.register_message_handler(del_cart, Text(equals='Удалить из корзины', ignore_case=True))
+    dp.register_message_handler(del_cart, commands=['Удалить из корзины' + '\U00002716'], state=None)
+    dp.register_message_handler(del_cart, Text(equals='Удалить из корзины ' + '\U00002716', ignore_case=True))
     dp.register_message_handler(del_product_cart, state=FSMcart.del_product)
+    dp.register_message_handler(main, commands='\U0001F3E0')
+    dp.register_message_handler(main, Text(equals='\U0001F3E0', ignore_case=True))
+    dp.register_message_handler(command_handler, commands=None)

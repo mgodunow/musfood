@@ -82,7 +82,8 @@ async def to_cart(user_id, cart, price):
 
 
 async def delete_user_cart(user_id, product):
-    product = cur.execute('SELECT rowid FROM cart WHERE user_id == ? AND product == ? LIMIT 1', (int(user_id),product)).fetchall()
+    product = cur.execute('SELECT rowid FROM cart WHERE user_id == ? AND product == ? LIMIT 1', (int(user_id),
+                                                                                                 product)).fetchall()
     print(product[0])
     cur.execute('DELETE FROM cart WHERE rowid == ?', product[0])
     base.commit()

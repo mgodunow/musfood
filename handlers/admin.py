@@ -36,7 +36,7 @@ async def cancel_fsm(message: types.Message, state: FSMContext):
     if current_state is None:
         return
     await state.finish()
-    await message.reply('Отменено')
+    await message.reply('Отменено', reply_markup=ReplyKeyboardMarkup().add(KeyboardButton('\U0001F3E0')))
 
 
 # Машина состояний для акций
