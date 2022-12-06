@@ -1,12 +1,14 @@
 from aiogram import Dispatcher
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardButton, InlineKeyboardMarkup
 from aiogram import types
+from aiogram.types.message import ContentType
 from keyboard.client_kb import kb_client_start, kb_client_menu, cart_kb
 from aiogram.dispatcher.filters import Text
 from aiogram.dispatcher.filters.state import State, StatesGroup
 from aiogram.dispatcher import FSMContext
 from sqlite_db.sqlite_db import *
 from bot_create import bot
+import os
 
 
 async def start(message: types.Message):
@@ -99,7 +101,8 @@ async def add_pos_to_cart(callback_query: types.CallbackQuery):
     user_id = callback_query.from_user.id
     productnprice = callback_query.data.replace('in_cart ', '').split('_')
     await to_cart(user_id, productnprice[0], productnprice[1])
-    await callback_query.answer(text=f'{callback_query.data.replace("in_cart","").split("_")[0]} : добавлено в корзину')
+    await callback_query.answer(
+        text=f'{callback_query.data.replace("in_cart", "").split("_")[0]} : добавлено в корзину')
 
 
 async def cart(message: types.Message):
@@ -107,9 +110,15 @@ async def cart(message: types.Message):
     cart = ''
     price = 0
     for product in products:
-        cart += str(product[0] + '\n')
+        cart += str(product[0] + f' {product[1]}' + '\n')
         price += int(product[1])
-    await bot.send_message(message.from_user.id, f'{cart}\nИтого:{price}', reply_markup=cart_kb)
+    if not cart:
+        await message.reply('Ваша корзина пуста')
+        return
+    if price >= 2500:
+        await bot.send_message(message.from_user.id, f'{cart}\nИтого:{price}', reply_markup=cart_kb)
+    else:
+        await bot.send_message(message.from_user.id, f'{cart}\nИтого с доставкой :{price + 500}', reply_markup=cart_kb)
 
 
 class FSMcart(StatesGroup):
@@ -136,6 +145,61 @@ async def del_product_cart(message: types.Message, state: FSMContext):
     await state.finish()
 
 
+# class Buy(StatesGroup):
+#     address = State()
+#
+#
+# async def buy(message: types.Message):
+#     await Buy.address.set()
+#     await bot.send_message('Введите адрес доставки')
+#
+#
+# async def load_address(message: types.Message, state: FSMContext):
+#
+
+async def process_buy(message: types.Message):
+    payment_token = os.getenv('PAYMENT_TOKEN')
+    products = await select_cart(message.from_user.id)
+    if not products:
+        await message.reply('Вы ничего не выбрали')
+        return
+    prices = []
+    total_price = 0
+    for product in products:
+        total_price += int(product[1])
+        price = types.LabeledPrice(label=product[0], amount=int(product[1]) * 100)
+        prices.append(price)
+    if total_price < 2500:
+        prices.append(types.LabeledPrice(label='Доставка', amount=500 * 100))
+    if payment_token.split(':')[1] == 'TEST':
+        await bot.send_message(message.from_user.id, 'Платеж является тестовым.')
+    await bot.send_invoice(
+        message.from_user.id,
+        title='Оплата заказа',
+        description='Оплата доставки и заказа',
+        provider_token=payment_token,
+        currency='rub',
+        need_shipping_address=True,
+        prices=prices,
+        payload='test-invoice-payload',
+        is_flexible=False,
+    )
+
+
+async def pre_checkout_query(pre_checkout_q: types.PreCheckoutQuery):
+    await bot.answer_pre_checkout_query(pre_checkout_q.id, ok=True)
+
+
+async def successful_payment(message: types.Message):
+    await delete_cart(message.from_user.id)
+    payment_info = message.successful_payment.to_python()
+    for k, v in payment_info.items():
+        print(f'{k} {v}')
+
+    await bot.send_message(message.from_user.id, f'Платеж на сумму {message.successful_payment.total_amount // 100}'
+                                                 f'{message.successful_payment.currency} успешно прошел')
+
+
 async def command_handler(message: types.Message):
     await message.reply('Такой команды нет ' + '\U0001f60C')
 
@@ -158,4 +222,8 @@ def register_client_handers(dp: Dispatcher):
     dp.register_message_handler(del_product_cart, state=FSMcart.del_product)
     dp.register_message_handler(main, commands='\U0001F3E0')
     dp.register_message_handler(main, Text(equals='\U0001F3E0', ignore_case=True))
+    dp.register_message_handler(process_buy, commands=['Оформить зака ' + '\U0001F69B'])
+    dp.register_message_handler(process_buy, Text(equals='Оформить заказ ' + '\U0001F69B', ignore_case=True))
+    dp.register_pre_checkout_query_handler(pre_checkout_query, lambda query: True)
+    dp.register_message_handler(successful_payment, content_types=ContentType.SUCCESSFUL_PAYMENT)
     dp.register_message_handler(command_handler, commands=None)

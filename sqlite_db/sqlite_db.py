@@ -87,3 +87,8 @@ async def delete_user_cart(user_id, product):
     print(product[0])
     cur.execute('DELETE FROM cart WHERE rowid == ?', product[0])
     base.commit()
+
+
+async def delete_cart(user_id):
+    cur.execute('DELETE FROM cart WHERE user_id == ?', (int(user_id),))
+    base.commit()
