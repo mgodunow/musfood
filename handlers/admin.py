@@ -10,7 +10,7 @@ from keyboard.admin_kb import kb_admin, kb_admin_cancel
 
 # Получаем id администраторов чата
 async def id_moderators_list():
-    admins = await bot.get_chat_administrators(chat_id='chat_id')
+    admins = await bot.get_chat_administrators(chat_id=-1001843970860)
     text = []
     for admin in admins:
         user_id = admin.user.id

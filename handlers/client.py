@@ -2,13 +2,13 @@ from aiogram import Dispatcher
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardButton, InlineKeyboardMarkup
 from aiogram import types
 from aiogram.types.message import ContentType
+import config
 from keyboard.client_kb import kb_client_start, kb_client_menu, cart_kb
 from aiogram.dispatcher.filters import Text
 from aiogram.dispatcher.filters.state import State, StatesGroup
 from aiogram.dispatcher import FSMContext
 from sqlite_db.sqlite_db import *
 from bot_create import bot
-import os
 
 
 async def start(message: types.Message):
@@ -158,7 +158,7 @@ async def del_product_cart(message: types.Message, state: FSMContext):
 #
 
 async def process_buy(message: types.Message):
-    payment_token = os.getenv('PAYMENT_TOKEN')
+    payment_token = config.PAYMENT_TOKEN
     products = await select_cart(message.from_user.id)
     if not products:
         await message.reply('Вы ничего не выбрали')
